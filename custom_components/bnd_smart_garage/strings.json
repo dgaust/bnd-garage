@@ -46,22 +46,32 @@
       "init": {
         "title": "B&D Smart Garage options",
         "data": {
-          "scan_interval": "Idle polling interval"
+          "scan_interval": "Idle polling interval",
+          "push_probe": "Push probe (experimental)"
         },
         "data_description": {
-          "scan_interval": "Polling speeds up automatically to 2s while a door is moving."
+          "scan_interval": "Polling speeds up automatically to 2s while a door is moving.",
+          "push_probe": "Debug aid: logs whether the hub's message queue can deliver instant updates. Needs debug logging on to see output. Leave off normally."
         }
       }
     }
   },
   "entity": {
     "light": {
-      "light": { "name": "Light" }
+      "light": {
+        "name": "Light"
+      }
     },
     "switch": {
-      "auxiliary": { "name": "Auxiliary output" },
-      "remote_lockout": { "name": "Remote lockout" },
-      "phone_lockout": { "name": "Phone lockout" }
+      "auxiliary": {
+        "name": "Auxiliary output"
+      },
+      "remote_lockout": {
+        "name": "Remote lockout"
+      },
+      "phone_lockout": {
+        "name": "Phone lockout"
+      }
     },
     "sensor": {
       "door_state": {
@@ -74,7 +84,9 @@
           "partial": "Partially open"
         }
       },
-      "last_activity": { "name": "Last activity" }
+      "last_activity": {
+        "name": "Last activity"
+      }
     }
   }
 }

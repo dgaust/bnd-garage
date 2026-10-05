@@ -277,6 +277,7 @@ class HubClient:
                         timeout=aiohttp.ClientTimeout(total=15),
                     ) as response:
                         if response.status == 403 and not retry:
+                            _LOGGER.debug("%s: session rejected (403), renewing", endpoint)
                             self._token = ""
                             continue
                         if response.status in (401, 403):

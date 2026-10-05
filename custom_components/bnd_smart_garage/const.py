@@ -15,6 +15,8 @@ CONF_CREDENTIALS: Final = "credentials"
 
 CONF_SCAN_INTERVAL: Final = "scan_interval"
 DEFAULT_SCAN_INTERVAL: Final = 5
+CONF_PUSH_PROBE: Final = "push_probe"
+"""Experimental: run probe.py's message-queue logger (debug aid)."""
 MIN_SCAN_INTERVAL: Final = 5
 MAX_SCAN_INTERVAL: Final = 300
 
