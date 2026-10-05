@@ -52,6 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BndConfigEntry) -> bool:
         hub_info = None
 
     coordinator = BndCoordinator(hass, entry, client, hub_info)
+    await coordinator.async_load_presets()
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 

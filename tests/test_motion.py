@@ -81,3 +81,47 @@ def test_target_against_direction_ignored() -> None:
     tracker.command_sent(0, target=0)  # asked to close...
     tracker.update(1, 40, OPEN_RATE)  # ...but it's opening (e.g. obstruction reversal)
     assert tracker.position(30) == 100
+
+
+VENTILATION = 7
+
+
+def test_preset_learns_resting_position() -> None:
+    learner = motion.PresetLearner()
+    assert learner.target("door", VENTILATION) is None
+    learner.sent("door", VENTILATION, 0)
+    assert not learner.observe("door", 1, 0, moving=False)  # not started yet
+    assert not learner.observe("door", 2, 0, moving=True)
+    assert learner.observe("door", 13, 75, moving=False)
+    assert learner.target("door", VENTILATION) == 75
+
+
+def test_preset_relearns_when_changed_in_app() -> None:
+    learner = motion.PresetLearner({"door:7": 75})
+    learner.sent("door", VENTILATION, 0)
+    learner.observe("door", 1, 0, moving=True)
+    assert learner.observe("door", 10, 60, moving=False)
+    assert learner.target("door", VENTILATION) == 60
+
+
+def test_preset_cancelled_by_other_command() -> None:
+    learner = motion.PresetLearner()
+    learner.sent("door", VENTILATION, 0)
+    learner.observe("door", 1, 0, moving=True)
+    learner.cancel("door")  # user hit stop
+    assert not learner.observe("door", 3, 20, moving=False)
+    assert learner.target("door", VENTILATION) is None
+
+
+def test_preset_learning_times_out() -> None:
+    learner = motion.PresetLearner()
+    learner.sent("door", VENTILATION, 0)
+    learner.observe("door", 1, 0, moving=True)
+    assert not learner.observe("door", 500, 75, moving=False)
+
+
+def test_learned_preset_target_stops_estimate() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=75)
+    tracker.update(1, 0, OPEN_RATE)
+    assert tracker.position(30) == 75

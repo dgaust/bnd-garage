@@ -48,6 +48,11 @@ class BndPresetButton(BndEntity, ButtonEntity):
         return label or f"Preset {self._command}"
 
     @property
+    def extra_state_attributes(self) -> dict[str, int] | None:
+        learned = self.coordinator.presets.target(self.device_id, self._command)
+        return None if learned is None else {"learned_position": learned}
+
+    @property
     def available(self) -> bool:
         # A preset removed in the app disappears from the hub's list.
         return super().available and any(
@@ -56,5 +61,7 @@ class BndPresetButton(BndEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         await self.coordinator.async_command(
-            self.coordinator.client.send_command(self.device_id, self._command)
+            self.coordinator.client.send_command(self.device_id, self._command),
+            device_id=self.device_id,
+            preset=self._command,
         )

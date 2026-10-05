@@ -87,3 +87,63 @@ class MotionTracker:
         if travel.target is not None:
             estimate = min(estimate, travel.target) if travel.rate > 0 else max(estimate, travel.target)
         return max(0.0, min(100.0, estimate))
+
+
+PRESET_LEARN_TIMEOUT = 120.0
+"""Give up on learning a preset's position if the door hasn't finished
+travelling this long after the command."""
+
+
+class PresetLearner:
+    """Learns where each partial-open preset stops.
+
+    The hub never says what position a preset (e.g. "Ventilation") drives to;
+    the user sets it in the app. So when a preset is sent, the door is
+    watched until it has moved and stopped again, and that resting position
+    is remembered as the preset's target - used next time to stop the live
+    estimate at the right place instead of overshooting until the hub
+    reports the stop. Re-learned on every use, so a preset moved in the app
+    corrects itself after one press.
+    """
+
+    def __init__(self, positions: dict[str, int] | None = None) -> None:
+        self.positions: dict[str, int] = dict(positions or {})
+        self._pending: dict[str, tuple[int, float, bool]] = {}
+
+    @staticmethod
+    def key(device_id: str, command: int) -> str:
+        """Storage key for one door's preset slot."""
+        return f"{device_id}:{command}"
+
+    def target(self, device_id: str, command: int) -> int | None:
+        """The learned stop position for this preset, if known."""
+        return self.positions.get(self.key(device_id, command))
+
+    def sent(self, device_id: str, command: int, now: float) -> None:
+        """A preset command was just sent."""
+        self._pending[device_id] = (command, now, False)
+
+    def observe(self, device_id: str, now: float, position: int, moving: bool) -> bool:
+        """Feed a poll; returns True when a preset position was (re)learned."""
+        pending = self._pending.get(device_id)
+        if pending is None:
+            return False
+        command, sent_at, seen_motion = pending
+        if now - sent_at > PRESET_LEARN_TIMEOUT:
+            del self._pending[device_id]
+            return False
+        if moving:
+            self._pending[device_id] = (command, sent_at, True)
+            return False
+        if not seen_motion or position < 0:
+            return False  # not started yet (or already there: nothing to learn)
+        del self._pending[device_id]
+        key = self.key(device_id, command)
+        if self.positions.get(key) == position:
+            return False
+        self.positions[key] = position
+        return True
+
+    def cancel(self, device_id: str) -> None:
+        """Another command superseded the preset (e.g. stop, open)."""
+        self._pending.pop(device_id, None)

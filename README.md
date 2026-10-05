@@ -19,7 +19,7 @@ Per door opener on the hub:
 | `switch` Auxiliary output | only if advertised (needs a non-zero aux output time on the hub) |
 | `switch` Remote lockout | disables physical remotes / wall buttons |
 | `switch` Phone lockout | disables app (and HA) commands — status still works; turning it off is never blocked |
-| `button` per preset | the partial-open presets you set up in the app (e.g. "Pet") |
+| `button` per preset | the partial-open presets you set up in the app (e.g. "Pet"). Each preset's stop position is learned the first time it's used (`learned_position` attribute) so the live position stops at the right place. |
 
 Polling is local: every 5 s idle (configurable), every 1 s while a door moves
 or just after a command. The hub only reports where the door *started* and

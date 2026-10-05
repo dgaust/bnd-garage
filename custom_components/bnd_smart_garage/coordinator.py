@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -22,7 +23,7 @@ from .const import (
     FAST_POLL_AFTER_COMMAND,
     FAST_SCAN_INTERVAL,
 )
-from .motion import MotionTracker
+from .motion import MotionTracker, PresetLearner
 from .protocol import (
     AuthenticationError,
     DeviceStatus,
@@ -74,8 +75,16 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         self._last_rescan: datetime = dt_util.utcnow()
         self._last_log_ids: dict[str, int] = {}
         self.motion: dict[str, MotionTracker] = {d: MotionTracker() for d in self.device_ids}
+        self.presets = PresetLearner()
+        self._preset_store: Store[dict[str, int]] = Store(
+            hass, 1, f"{DOMAIN}.{entry.entry_id}.preset_positions"
+        )
         self.new_devices: tuple[str, ...] = ()
         """Doors found on the hub after pairing; __init__ reloads to add them."""
+
+    async def async_load_presets(self) -> None:
+        """Restore learned preset positions from storage."""
+        self.presets = PresetLearner(await self._preset_store.async_load() or {})
 
     async def _async_update_data(self) -> dict[str, DeviceStatus]:
         try:
@@ -92,6 +101,9 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         now = time.monotonic()
         for device_id, status in data.items():
             self.motion.setdefault(device_id, MotionTracker()).update(now, status.position, status.rate)
+            if self.presets.observe(device_id, now, status.position, status.moving):
+                _LOGGER.debug("Learned preset positions: %s", self.presets.positions)
+                self._preset_store.async_delay_save(lambda: self.presets.positions, 5)
         self._fire_activity_events(data)
         self._tune_interval(data)
         return data
@@ -155,12 +167,21 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         *,
         device_id: str | None = None,
         target: float | None = None,
+        preset: int | None = None,
     ) -> None:
         """Run a hub command, then poll fast so the result shows promptly.
 
         Door-moving commands pass `device_id` (and `target` when known) so the
-        motion estimate can anchor on the moment the command went out.
+        motion estimate can anchor on the moment the command went out; a
+        preset passes its command code so its stop position can be learned
+        and used as the target.
         """
+        if device_id is not None:
+            if preset is not None:
+                self.presets.sent(device_id, preset, time.monotonic())
+                target = self.presets.target(device_id, preset)
+            else:
+                self.presets.cancel(device_id)
         if device_id is not None and device_id in self.motion:
             # Before awaiting: a scheduled poll may see the motion first.
             self.motion[device_id].command_sent(time.monotonic(), target)
