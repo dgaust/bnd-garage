@@ -17,7 +17,6 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
-    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -29,7 +28,6 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_ACTIVATION_CODE,
     CONF_CREDENTIALS,
-    CONF_PUSH_PROBE,
     CONF_SCAN_INTERVAL,
     CONF_USER_PASSWORD,
     DEFAULT_SCAN_INTERVAL,
@@ -164,10 +162,7 @@ class BndOptionsFlow(OptionsFlowWithReload):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(
-                data={
-                    CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
-                    CONF_PUSH_PROBE: bool(user_input.get(CONF_PUSH_PROBE, False)),
-                }
+                data={CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL])}
             )
         schema = vol.Schema(
             {
@@ -183,10 +178,6 @@ class BndOptionsFlow(OptionsFlowWithReload):
                         mode=NumberSelectorMode.BOX,
                     )
                 ),
-                vol.Optional(
-                    CONF_PUSH_PROBE,
-                    default=self.config_entry.options.get(CONF_PUSH_PROBE, False),
-                ): BooleanSelector(),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

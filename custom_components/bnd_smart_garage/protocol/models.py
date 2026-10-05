@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import json
 from enum import StrEnum
 from typing import Any
 
@@ -217,6 +218,34 @@ def parse_device(device_id: str, entry: dict[str, Any]) -> DeviceStatus:
         raw=entry,
         **toggles,
     )
+
+
+def parse_events(messages: list[dict[str, Any]]) -> list[DeviceStatus]:
+    """Parse app/res/messages output into door statuses.
+
+    Live-verified: the hub queues one message per status change (start/stop
+    of travel, light, lock button...) on the session, shaped
+    {"data": "<json>", "time": ..., "type": 1, ...} where data is the same
+    {"deviceOrder": [...], "devices": [...]} document devices/fetch returns -
+    a complete status, not a delta. Anything else (e.g. async command
+    results) is ignored.
+    """
+    statuses: list[DeviceStatus] = []
+    for message in messages:
+        if message.get("processState") == -1:
+            continue
+        try:
+            body = json.loads(message.get("data") or "")
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(body, dict):
+            continue
+        order = body.get("deviceOrder") or []
+        for index, entry in enumerate(body.get("devices") or []):
+            device_id = device_id_of(entry) or (order[index] if index < len(order) else None)
+            if device_id:
+                statuses.append(parse_device(device_id, entry))
+    return statuses
 
 
 def device_id_of(entry: dict[str, Any]) -> str | None:

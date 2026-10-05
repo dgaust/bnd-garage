@@ -21,10 +21,13 @@ Per door opener on the hub:
 | `switch` Phone lockout | disables app (and HA) commands — status still works; turning it off is never blocked |
 | `button` per preset | the partial-open presets you set up in the app (e.g. "Pet"). Each preset's stop position is learned the first time it's used (`learned_position` attribute) so the live position stops at the right place. |
 
-Polling is local: every 5 s idle (configurable), every 1 s while a door moves
-or just after a command. The hub only reports where the door *started* and
-its speed while it travels, so the cover's position is estimated live (updated
-every second) and replaced by the hub's real position when the door stops.
+Updates are local and near-instant: the integration drains the hub's change
+queue every second (the same mechanism the B&D app uses), so wall-button and
+remote presses show up within about a second. A full refresh every 30 s
+(configurable) is a safety net. The hub only reports where the door *started*
+and its speed while it travels, so the cover's position is estimated live
+(updated every second, anchored on the hub's own "Opening/Closing" timestamp)
+and replaced by the hub's real position when the door stops.
 
 ### Activity event
 

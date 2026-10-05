@@ -125,3 +125,18 @@ def test_learned_preset_target_stops_estimate() -> None:
     tracker.command_sent(0, target=75)
     tracker.update(1, 0, OPEN_RATE)
     assert tracker.position(30) == 75
+
+
+def test_hub_log_start_time_wins() -> None:
+    tracker = motion.MotionTracker()
+    tracker.update(0, 0, 0)
+    # Remote press seen 4s after the last poll, hub log says it began 1.2s ago.
+    tracker.update(4, 0, OPEN_RATE, started_ago=1.2)
+    assert tracker.position(4) == pytest.approx(OPEN_RATE * 1.2)
+
+
+def test_hub_log_start_time_keeps_command_target() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=50)
+    tracker.update(1, 0, OPEN_RATE, started_ago=0.6)
+    assert tracker.position(30) == 50

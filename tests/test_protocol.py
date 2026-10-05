@@ -160,3 +160,35 @@ def test_parse_logs_hides_noise() -> None:
         [{"logType": 0, "text": "x"}, {"logType": 5, "text": "Opened", "logId": 1}]
     )
     assert [entry.text for entry in logs] == ["Opened"]
+
+
+def _event(entry: dict) -> dict:
+    """Envelope shape live-captured from an SDO-7's app/res/messages queue."""
+    body = {"deviceOrder": [entry.get("deviceId", "Zr0kaOXH")], "devices": [entry]}
+    return {"data": json.dumps(body), "time": 30903446, "type": 1, "isEncrypted": False}
+
+
+def test_parse_events_full_status() -> None:
+    entry = {
+        **SAMPLE_DEVICE,
+        "device": {"position": 0, "rate": 7.143},
+        "log": {"text": "Opening by David", "time": 1791194369107, "logId": 7},
+        "deviceId": "Zr0kaOXH",
+    }
+    (status,) = models.parse_events([_event(entry)])
+    assert status.device_id == "Zr0kaOXH"
+    assert status.state is models.DoorState.OPENING
+    assert status.activity.text == "Opening by David"
+    assert [p.label for p in status.presets] == ["Pet", "Parcel"]
+
+
+def test_parse_events_falls_back_to_device_order() -> None:
+    entry = {"device": {"position": 100, "rate": 0}}
+    message = {"data": json.dumps({"deviceOrder": ["abc"], "devices": [entry]}), "type": 1}
+    assert [s.device_id for s in models.parse_events([message])] == ["abc"]
+
+
+def test_parse_events_ignores_other_messages() -> None:
+    assert models.parse_events([{"processState": -1, "data": "{}"}]) == []
+    assert models.parse_events([{"processState": 0, "data": "not json"}]) == []
+    assert models.parse_events([{"processState": 0, "data": '{"code": 1}'}]) == []

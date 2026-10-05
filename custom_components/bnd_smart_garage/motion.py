@@ -9,7 +9,8 @@ the current position is extrapolated as start + rate * elapsed.
 The hub gives no usable start timestamp, so elapsed is anchored on what HA
 knows: the moment it sent the command, or - for motion started by a remote or
 wall button - halfway between the last idle poll and the poll that first saw
-the motion. Each time the door stops, the hub's real position replaces the
+the motion - unless the hub's "Opening/Closing by ..." log entry supplies the
+exact start time, which wins. Each time the door stops, the hub's real position replaces the
 estimate. Kept free of Home Assistant imports so it is unit-testable.
 """
 
@@ -44,8 +45,15 @@ class MotionTracker:
         self._command_at = now
         self._command_target = target
 
-    def update(self, now: float, position: int, rate: float) -> None:
-        """Feed one status poll."""
+    def update(
+        self, now: float, position: int, rate: float, started_ago: float | None = None
+    ) -> None:
+        """Feed one status poll.
+
+        `started_ago`: seconds since the travel began per the hub's own
+        "Opening/Closing by ..." log timestamp, when available - the most
+        accurate anchor there is.
+        """
         if rate == 0 or position < 0:
             self._travel = None
         elif (
@@ -54,10 +62,12 @@ class MotionTracker:
             or self._travel.rate != rate
         ):
             # New travel, or the hub re-based (reversal / restart mid-travel).
-            self._travel = self._start_travel(now, position, rate)
+            self._travel = self._start_travel(now, position, rate, started_ago)
         self._last_poll = now
 
-    def _start_travel(self, now: float, position: int, rate: float) -> _Travel:
+    def _start_travel(
+        self, now: float, position: int, rate: float, started_ago: float | None
+    ) -> _Travel:
         command_at, target = self._command_at, self._command_target
         self._command_at = self._command_target = None
         if command_at is not None and 0 <= now - command_at <= COMMAND_ANCHOR_WINDOW:
@@ -71,6 +81,8 @@ class MotionTracker:
                 anchor = now - (now - self._last_poll) / 2
             else:
                 anchor = now
+        if started_ago is not None:
+            anchor = now - started_ago
         return _Travel(position, rate, anchor, target)
 
     @property

@@ -46,12 +46,10 @@
       "init": {
         "title": "B&D Smart Garage options",
         "data": {
-          "scan_interval": "Idle polling interval",
-          "push_probe": "Push probe (experimental)"
+          "scan_interval": "Full refresh interval"
         },
         "data_description": {
-          "scan_interval": "Polling speeds up automatically to 2s while a door is moving.",
-          "push_probe": "Debug aid: logs whether the hub's message queue can deliver instant updates. Needs debug logging on to see output. Leave off normally."
+          "scan_interval": "Changes (including wall button and remote presses) arrive within about a second via the hub's event queue; this periodic full refresh is a safety net."
         }
       }
     }

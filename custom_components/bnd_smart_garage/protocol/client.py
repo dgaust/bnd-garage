@@ -43,6 +43,7 @@ from .models import (
     action_for_command,
     device_id_of,
     parse_device,
+    parse_events,
     parse_hub_info,
     parse_logs,
 )
@@ -105,6 +106,9 @@ class HubClient:
         # The session state isn't safe for concurrent negotiation, and the
         # hub dislikes overlapping requests anyway - serialise everything.
         self._lock = asyncio.Lock()
+        # Door events found while send_command drained the queue for its own
+        # result; handed to the next get_events() so the listener misses none.
+        self._buffered_events: list[DeviceStatus] = []
 
     @property
     def _base(self) -> str:
@@ -135,6 +139,17 @@ class HubClient:
             if devices := body.get("devices"):
                 return parse_device(device_id, devices[0])
         return DeviceStatus(device_id=device_id)
+
+    async def get_events(self) -> list[DeviceStatus]:
+        """Drain the session's event queue: one full status per change.
+
+        Answers immediately (no long-poll) and is usually empty, so it's cheap
+        to call every second - this is how the app learns of wall-button and
+        remote presses within a second.
+        """
+        fresh = parse_events(await self._call("app/res/messages", None))
+        events, self._buffered_events = [*self._buffered_events, *fresh], []
+        return events
 
     async def get_hub_info(self) -> HubInfo | None:
         """Hub name, firmware, MAC, Wi-Fi signal."""
@@ -188,7 +203,9 @@ class HubClient:
                 _raise_for_error(message)
             if state == 1:
                 await asyncio.sleep(_ASYNC_RESULT_DELAY)
-                for polled in await self._call("app/res/messages", None):
+                polled_messages = await self._call("app/res/messages", None)
+                self._buffered_events.extend(parse_events(polled_messages))
+                for polled in polled_messages:
                     if polled.get("processState") == -1:
                         _raise_for_error(polled)
                 return

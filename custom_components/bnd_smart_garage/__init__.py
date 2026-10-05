@@ -11,10 +11,9 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_CREDENTIALS, CONF_PUSH_PROBE, DOMAIN
+from .const import CONF_CREDENTIALS, DOMAIN
 from .coordinator import BndCoordinator
 from .entity import hub_device_info
-from .probe import run_push_probe
 from .protocol import AuthenticationError, Credentials, GarageError, HubClient
 from .protocol.transport import hub_ssl_context
 
@@ -81,14 +80,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: BndConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    if entry.options.get(CONF_PUSH_PROBE):
-        _LOGGER.warning(
-            "B&D push probe is ON (experimental). Enable debug logging for this "
-            "integration to see its output; turn it off in the options when done"
-        )
-        entry.async_create_background_task(
-            hass, run_push_probe(coordinator), "bnd_smart_garage push probe"
-        )
+    # Near-instant updates (incl. wall button / remote) from the hub's queue.
+    entry.async_create_background_task(
+        hass, coordinator.async_listen_events(), "bnd_smart_garage events"
+    )
 
     # Hang each door device off the hub device.
     registry = dr.async_get(hass)

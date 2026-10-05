@@ -50,6 +50,20 @@ tests/test_protocol.py   protocol tests (no HA needed)
   encoding and the log entry is written at the *end* of travel, so neither
   anchors the start - HA's command time (or half the poll gap) does.
 
+- **Change queue = push (live-verified)**: `app/res/messages` answers
+  immediately (no long-poll) and is normally empty, but the hub queues one
+  message per status change on the session - `{"data": "<devices/fetch
+  document>", "type": 1, ...}`, a *full* status incl. `aux` and `log`.
+  Draining it every second gets wall-button/remote presses in ~0.2-1s
+  (`HubClient.get_events`, `coordinator.async_listen_events`).
+- **One session per paired user**: a second concurrent session makes both
+  get 403s and re-login in a loop. Everything shares one `HubClient`.
+- **Travel start time**: the hub logs "Opening by X"/"Closing by X" at the
+  start of travel (and "Open/Closed by X" at the end) with a unix-ms `time`;
+  its clock matched HA's within ~0.5s, so that anchors the estimate.
+- The hub constantly broadcasts UDP camera-discovery probes (`MO_I` to :10000,
+  `_IVO` to :20000) - unrelated to door state.
+
 ## Status / validation
 
 Running on a real SDO-7 hub (fw FW101-123) in HA 2026.10 since v0.1.1:
