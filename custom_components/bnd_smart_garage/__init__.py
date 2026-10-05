@@ -92,10 +92,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: BndConfigEntry) -> bool:
 
     # Hang each door device off the hub device.
     registry = dr.async_get(hass)
-    if hub := registry.async_get_device(identifiers={(DOMAIN, coordinator.hub_id)}):
+    if hub := registry.async_get_device_by_identifier(
+        identifier=(DOMAIN, coordinator.hub_id), config_entry_id=entry.entry_id
+    ):
         for device_id in coordinator.device_ids:
-            door = registry.async_get_device(
-                identifiers={(DOMAIN, f"{coordinator.hub_id}_{device_id}")}
+            door = registry.async_get_device_by_identifier(
+                identifier=(DOMAIN, f"{coordinator.hub_id}_{device_id}"),
+                config_entry_id=entry.entry_id,
             )
             if door and door.via_device_id != hub.id:
                 registry.async_update_device(door.id, via_device_id=hub.id)

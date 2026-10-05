@@ -6,8 +6,10 @@ message queue (`app/res/messages`) can act as a push channel - e.g. by
 holding the request open until something happens (long-poll), or by queueing
 status events between calls.
 
-It runs on its *own* HubClient session so a long-held request can't block
-the coordinator's polling, and logs at DEBUG under
+It shares the coordinator's HubClient: the hub allows only ONE session per
+paired user (a second session makes the two kick each other off with 403s -
+found by an earlier version of this probe), and calls answer in well under a
+second (no long-poll), so sharing costs little. Logs at DEBUG under
 `custom_components.bnd_smart_garage.probe`:
 
 - every call that returns messages, or takes longer than SLOW_SECONDS, with
@@ -27,7 +29,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
-from .protocol import GarageError, HubClient
+from .protocol import GarageError
 
 if TYPE_CHECKING:
     from .coordinator import BndCoordinator
@@ -47,13 +49,12 @@ VARIANTS: tuple[tuple[str, str, dict[str, Any] | None], ...] = (
 
 async def run_push_probe(coordinator: BndCoordinator) -> None:
     """Loop forever (until cancelled on unload), logging what the queue does."""
-    main = coordinator.client
-    client = HubClient(main.host, main.credentials, main._http, main._ssl)  # noqa: SLF001
+    client = coordinator.client
     stats = {name: {"calls": 0, "hits": 0, "slowest": 0.0} for name, _, _ in VARIANTS}
     renewals = 0
     last_token = ""
     next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
-    _LOGGER.debug("push-probe started against %s", main.host)
+    _LOGGER.debug("push-probe started against %s", client.host)
 
     while True:
         for name, endpoint, body in VARIANTS:
