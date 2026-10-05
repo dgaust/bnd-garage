@@ -1,0 +1,80 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pair a B&D garage hub",
+        "description": "In the B&D Smart Garage Access app: Settings → Users → your hub → Add new user. Enter the activation code and the password the app assigns. Home Assistant will appear in the hub as its own user.",
+        "data": {
+          "host": "Hub IP address",
+          "activation_code": "Activation code",
+          "user_password": "User password"
+        },
+        "data_description": {
+          "host": "Give the hub a DHCP reservation so this doesn't change."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-pair the B&D hub",
+        "description": "The hub at {host} rejected Home Assistant's credentials. Create a new user in the B&D app and enter its activation code and password.",
+        "data": {
+          "activation_code": "Activation code",
+          "user_password": "User password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change hub address",
+        "data": {
+          "host": "Hub IP address"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the hub. Check the IP address and that it's on the same network.",
+      "invalid_auth": "The activation code or password was rejected. Codes are single-use - generate a new one.",
+      "pairing_failed": "The hub accepted the code but pairing didn't complete. Check the logs, then try again with a new activation code.",
+      "unknown": "Unexpected error - see the logs."
+    },
+    "abort": {
+      "already_configured": "This hub is already configured.",
+      "reauth_successful": "Re-paired successfully.",
+      "reconfigure_successful": "Hub address updated.",
+      "wrong_hub": "That address belongs to a different B&D hub."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "B&D Smart Garage options",
+        "data": {
+          "scan_interval": "Idle polling interval"
+        },
+        "data_description": {
+          "scan_interval": "Polling speeds up automatically to 2s while a door is moving."
+        }
+      }
+    }
+  },
+  "entity": {
+    "light": {
+      "light": { "name": "Light" }
+    },
+    "switch": {
+      "auxiliary": { "name": "Auxiliary output" },
+      "remote_lockout": { "name": "Remote lockout" },
+      "phone_lockout": { "name": "Phone lockout" }
+    },
+    "sensor": {
+      "door_state": {
+        "name": "Door state",
+        "state": {
+          "open": "Open",
+          "closed": "Closed",
+          "opening": "Opening",
+          "closing": "Closing",
+          "partial": "Partially open"
+        }
+      },
+      "last_activity": { "name": "Last activity" }
+    }
+  }
+}

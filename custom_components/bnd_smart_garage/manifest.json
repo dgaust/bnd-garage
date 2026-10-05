@@ -1,0 +1,14 @@
+{
+  "domain": "bnd_smart_garage",
+  "name": "B&D Smart Garage",
+  "codeowners": ["@dgaust"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/dgaust/bnd-garage",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/dgaust/bnd-garage/issues",
+  "loggers": ["custom_components.bnd_smart_garage"],
+  "requirements": [],
+  "version": "0.1.0"
+}
