@@ -11,7 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_CREDENTIALS
+from .const import CONF_CREDENTIALS, DOMAIN
 from .coordinator import BndCoordinator
 from .entity import hub_device_info
 from .protocol import AuthenticationError, Credentials, GarageError, HubClient
@@ -78,6 +78,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: BndConfigEntry) -> bool:
     entry.async_on_unload(coordinator.async_add_listener(_check_new_devices))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Hang each door device off the hub device.
+    registry = dr.async_get(hass)
+    if hub := registry.async_get_device(identifiers={(DOMAIN, coordinator.hub_id)}):
+        for device_id in coordinator.device_ids:
+            door = registry.async_get_device(
+                identifiers={(DOMAIN, f"{coordinator.hub_id}_{device_id}")}
+            )
+            if door and door.via_device_id != hub.id:
+                registry.async_update_device(door.id, via_device_id=hub.id)
     return True
 
 

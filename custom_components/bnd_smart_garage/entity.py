@@ -44,8 +44,9 @@ class BndEntity(CoordinatorEntity[BndCoordinator]):
             manufacturer=MANUFACTURER,
             model="Garage door opener",
             name=(status.name if status and status.name else "Garage door"),
-            via_device=(DOMAIN, coordinator.hub_id),
         )
+        # No via_device here: deprecated (and an error on 2026.10+). The door
+        # is linked to the hub with via_device_id in __init__ after setup.
 
     @property
     def status(self) -> DeviceStatus | None:
