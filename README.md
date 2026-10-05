@@ -21,8 +21,10 @@ Per door opener on the hub:
 | `switch` Phone lockout | disables app (and HA) commands — status still works; turning it off is never blocked |
 | `button` per preset | the partial-open presets you set up in the app (e.g. "Pet") |
 
-Polling is local: every 10 s idle (configurable), every 2 s while a door moves
-or just after a command.
+Polling is local: every 5 s idle (configurable), every 1 s while a door moves
+or just after a command. The hub only reports where the door *started* and
+its speed while it travels, so the cover's position is estimated live (updated
+every second) and replaced by the hub's real position when the door stops.
 
 ### Activity event
 

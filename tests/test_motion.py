@@ -1,0 +1,83 @@
+"""MotionTracker tests, using rates observed on a real SDO-7 (no HA needed)."""
+
+from __future__ import annotations
+
+import importlib.util
+import pathlib
+import sys
+
+import pytest
+
+_PATH = pathlib.Path(__file__).parent.parent / "custom_components" / "bnd_smart_garage" / "motion.py"
+_spec = importlib.util.spec_from_file_location("bnd_motion", _PATH)
+motion = importlib.util.module_from_spec(_spec)
+sys.modules["bnd_motion"] = motion
+_spec.loader.exec_module(motion)
+
+OPEN_RATE = 7.143  # % per second -> 14s full travel
+CLOSE_RATE = -5.263  # -> 19s
+
+
+def test_idle_has_no_estimate() -> None:
+    tracker = motion.MotionTracker()
+    tracker.update(0, 0, 0)
+    assert tracker.position(1) is None and not tracker.moving
+
+
+def test_command_anchored_open() -> None:
+    tracker = motion.MotionTracker()
+    tracker.update(0, 0, 0)
+    tracker.command_sent(10, target=100)
+    tracker.update(11.5, 0, OPEN_RATE)  # hub reports start position + rate
+    assert tracker.position(17) == pytest.approx(7 * OPEN_RATE)
+    assert tracker.position(30) == 100  # clamped at target
+    tracker.update(25, 100, 0)  # stopped: real position takes over
+    assert tracker.position(26) is None
+
+
+def test_remote_started_anchors_halfway_between_polls() -> None:
+    tracker = motion.MotionTracker()
+    tracker.update(0, 100, 0)
+    tracker.update(5, 100, CLOSE_RATE)  # started somewhere in 0..5s
+    assert tracker.position(5) == pytest.approx(100 + CLOSE_RATE * 2.5)
+
+
+def test_same_report_does_not_reanchor() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=0)
+    tracker.update(1, 75, CLOSE_RATE)
+    tracker.update(2, 75, CLOSE_RATE)
+    tracker.update(3, 75, CLOSE_RATE)
+    assert tracker.position(4) == pytest.approx(75 + CLOSE_RATE * 4)
+
+
+def test_reversal_reanchors_on_new_start() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=100)
+    tracker.update(1, 0, OPEN_RATE)
+    tracker.command_sent(5, target=0)
+    tracker.update(6, 35, CLOSE_RATE)
+    assert tracker.position(7) == pytest.approx(35 + CLOSE_RATE * 2)
+
+
+def test_partial_target_clamps() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=50)
+    tracker.update(1, 0, OPEN_RATE)
+    assert tracker.position(20) == 50
+
+
+def test_stale_command_is_ignored() -> None:
+    tracker = motion.MotionTracker()
+    tracker.update(0, 0, 0)
+    tracker.command_sent(1, target=100)
+    tracker.update(55, 0, 0)  # idle poll
+    tracker.update(60, 0, OPEN_RATE)  # too long after the command: halfway anchor
+    assert tracker.position(60) == pytest.approx(OPEN_RATE * 2.5)
+
+
+def test_target_against_direction_ignored() -> None:
+    tracker = motion.MotionTracker()
+    tracker.command_sent(0, target=0)  # asked to close...
+    tracker.update(1, 40, OPEN_RATE)  # ...but it's opening (e.g. obstruction reversal)
+    assert tracker.position(30) == 100

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable
 from datetime import datetime, timedelta
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant, callback
@@ -21,6 +22,7 @@ from .const import (
     FAST_POLL_AFTER_COMMAND,
     FAST_SCAN_INTERVAL,
 )
+from .motion import MotionTracker
 from .protocol import (
     AuthenticationError,
     DeviceStatus,
@@ -39,10 +41,10 @@ _LOGGER = logging.getLogger(__name__)
 class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
     """Polls every door on one hub and runs commands against it.
 
-    Polling is adaptive: the configured interval (default 10s) while idle,
-    2s while any door is moving or for a short window after a command, so the
-    cover's opening/closing/position track travel closely without hammering
-    the hub when nothing is happening.
+    Polling is adaptive: the configured interval (default 5s) while idle,
+    1s while any door is moving or for a short window after a command. The
+    hub doesn't report position mid-travel, so per-door MotionTrackers turn
+    each poll's start-position + rate into a live estimate (see motion.py).
     """
 
     config_entry: BndConfigEntry
@@ -71,6 +73,7 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         self._fast_until: datetime | None = None
         self._last_rescan: datetime = dt_util.utcnow()
         self._last_log_ids: dict[str, int] = {}
+        self.motion: dict[str, MotionTracker] = {d: MotionTracker() for d in self.device_ids}
         self.new_devices: tuple[str, ...] = ()
         """Doors found on the hub after pairing; __init__ reloads to add them."""
 
@@ -86,6 +89,9 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         except GarageError as err:
             raise UpdateFailed(str(err)) from err
 
+        now = time.monotonic()
+        for device_id, status in data.items():
+            self.motion.setdefault(device_id, MotionTracker()).update(now, status.position, status.rate)
         self._fire_activity_events(data)
         self._tune_interval(data)
         return data
@@ -138,8 +144,26 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         moving = any(status.moving for status in data.values())
         self.update_interval = FAST_SCAN_INTERVAL if moving or boosted else self._idle_interval
 
-    async def async_command(self, action: Awaitable[None]) -> None:
-        """Run a hub command, then poll fast so the result shows promptly."""
+    def estimated_position(self, device_id: str) -> float | None:
+        """Live position estimate while the door travels, else None."""
+        tracker = self.motion.get(device_id)
+        return tracker.position(time.monotonic()) if tracker else None
+
+    async def async_command(
+        self,
+        action: Awaitable[None],
+        *,
+        device_id: str | None = None,
+        target: float | None = None,
+    ) -> None:
+        """Run a hub command, then poll fast so the result shows promptly.
+
+        Door-moving commands pass `device_id` (and `target` when known) so the
+        motion estimate can anchor on the moment the command went out.
+        """
+        if device_id is not None and device_id in self.motion:
+            # Before awaiting: a scheduled poll may see the motion first.
+            self.motion[device_id].command_sent(time.monotonic(), target)
         try:
             await action
         except HubCommandError as err:

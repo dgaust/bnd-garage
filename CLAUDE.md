@@ -42,6 +42,14 @@ tests/test_protocol.py   protocol tests (no HA needed)
   that's exactly `{"data":{"key":"`, so the key's *name* is lost; `_repair()`
   in pairing.py guesses the lost prefix. Tested.
 
+- **Mid-travel position (live-verified on an SDO-7, fw FW101-123)**: while
+  moving the hub reports the *start* position plus a constant `rate` in %/s
+  (+7.143 open = 14s, -5.263 close = 19s) and only reports the real position
+  once stopped. `motion.py` (HA-free, tested) extrapolates; the cover
+  re-publishes every second while travelling. `statusTime` is an unknown
+  encoding and the log entry is written at the *end* of travel, so neither
+  anchors the start - HA's command time (or half the poll gap) does.
+
 ## Status / validation
 
 **Not yet run against real hardware or a live HA** - written from the

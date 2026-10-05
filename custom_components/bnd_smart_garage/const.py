@@ -14,15 +14,18 @@ CONF_CREDENTIALS: Final = "credentials"
 """Entry data key holding protocol.Credentials.as_dict()."""
 
 CONF_SCAN_INTERVAL: Final = "scan_interval"
-DEFAULT_SCAN_INTERVAL: Final = 10
+DEFAULT_SCAN_INTERVAL: Final = 5
 MIN_SCAN_INTERVAL: Final = 5
 MAX_SCAN_INTERVAL: Final = 300
 
-FAST_SCAN_INTERVAL: Final = timedelta(seconds=2)
+FAST_SCAN_INTERVAL: Final = timedelta(seconds=1)
 """Polling cadence while a door is moving or just after we sent a command."""
-FAST_POLL_AFTER_COMMAND: Final = timedelta(seconds=60)
+FAST_POLL_AFTER_COMMAND: Final = timedelta(seconds=30)
 """How long to keep fast-polling after a command even if motion isn't seen
 yet - the hub can take a few seconds to report the door moving."""
+
+ESTIMATE_REFRESH_INTERVAL: Final = timedelta(seconds=1)
+"""How often the cover re-publishes its estimated position while moving."""
 
 DEVICE_RESCAN_INTERVAL: Final = timedelta(minutes=30)
 """How often to check the hub for doors added after pairing."""
