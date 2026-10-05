@@ -52,8 +52,8 @@ tests/test_protocol.py   protocol tests (no HA needed)
 
 ## Status / validation
 
-**Not yet run against real hardware or a live HA** - written from the
-published research. Validate after changes:
+Running on a real SDO-7 hub (fw FW101-123) in HA 2026.10 since v0.1.1:
+pairing, status, presets, light and aux discovered fine. Validate after changes:
 
 ```bash
 pytest tests                              # needs cryptography, aiohttp, pytest
