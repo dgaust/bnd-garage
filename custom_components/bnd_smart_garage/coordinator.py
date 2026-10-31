@@ -9,6 +9,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.storage import Store
@@ -19,6 +20,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_RESCAN_INTERVAL,
+    REDISCOVER_INTERVAL,
     DOMAIN,
     EVENT_ACTIVITY,
     EVENT_ERROR_BACKOFF,
@@ -27,6 +29,7 @@ from .const import (
     FAST_SCAN_INTERVAL,
 )
 from .motion import MotionTracker, PresetLearner
+from .protocol.discovery import find_hub
 from .protocol import (
     AuthenticationError,
     DeviceStatus,
@@ -83,6 +86,7 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         self.device_ids: tuple[str, ...] = client.credentials.devices
         self._fast_until: datetime | None = None
         self._last_rescan: datetime = dt_util.utcnow()
+        self._last_rediscover: datetime | None = None
         self._last_log_ids: dict[str, int] = {}
         self.motion: dict[str, MotionTracker] = {d: MotionTracker() for d in self.device_ids}
         self.presets = PresetLearner()
@@ -106,10 +110,39 @@ class BndCoordinator(DataUpdateCoordinator[dict[str, DeviceStatus]]):
         except AuthenticationError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except GarageError as err:
+            await self._maybe_rediscover()
             raise UpdateFailed(str(err)) from err
 
         self._process(data)
         return data
+
+    async def _maybe_rediscover(self) -> None:
+        """The hub stopped answering: check whether it moved to a new IP.
+
+        LAN discovery (the vendor app's own mechanism) finds the hub by its ID
+        whatever its address. If it answers somewhere else, save the new host
+        and reload. Rate-limited so a hub that's simply off isn't probed every
+        poll.
+        """
+        now = dt_util.utcnow()
+        if self._last_rediscover and now - self._last_rediscover < REDISCOVER_INTERVAL:
+            return
+        self._last_rediscover = now
+        try:
+            hub = await find_hub(self.hub_id)
+        except OSError as err:
+            _LOGGER.debug("Rediscovery failed: %s", err)
+            return
+        if hub is None or hub.ip == self.client.host:
+            return
+        _LOGGER.warning(
+            "B&D hub %s moved from %s to %s; updating and reloading",
+            self.hub_id, self.client.host, hub.ip,
+        )
+        self.hass.config_entries.async_update_entry(
+            self.config_entry, data={**self.config_entry.data, CONF_HOST: hub.ip}
+        )
+        self.hass.config_entries.async_schedule_reload(self.config_entry.entry_id)
 
     @callback
     def _process(self, data: dict[str, DeviceStatus]) -> None:

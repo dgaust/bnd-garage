@@ -55,19 +55,20 @@ Manual: copy `custom_components/bnd_smart_garage` into `config/custom_components
 1. Give the hub a DHCP reservation.
 2. In the B&D app: **Settings → Users → your hub → Add new user**. Note the
    **activation code** and the **password** the app assigns.
-3. Settings → Devices & services → Add → **B&D Smart Garage**; enter hub IP,
-   activation code and password.
+3. Settings → Devices & services → Add → **B&D Smart Garage**. The hub's IP is
+   filled in automatically if it answers LAN discovery; enter the activation
+   code and password.
 
 Pairing redeems the activation code once with B&D's cloud
 (`version2.smartdoordevices.com`); everything afterwards is LAN-only.
 Activation codes are single-use — if pairing fails, generate a new one.
 
-If the hub's IP changes, use **Reconfigure** (no re-pair). If HA's user is
+If the hub's IP changes, the integration finds it again by its ID (LAN
+discovery) and updates the address itself; **Reconfigure** also works. If HA's user is
 deleted in the app, HA asks you to re-pair with a new code.
 
 ## Limitations
 
-- No auto-discovery (enter the IP).
 - New presets added in the app appear after reloading the integration; new
   doors are picked up automatically within 30 minutes.
 - Advanced parameters (light time, auto-close) are implemented in the protocol

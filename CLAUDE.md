@@ -47,8 +47,8 @@ tests/test_protocol.py   protocol tests (no HA needed)
   (+7.143 open = 14s, -5.263 close = 19s) and only reports the real position
   once stopped. `motion.py` (HA-free, tested) extrapolates; the cover
   re-publishes every second while travelling. `statusTime` is an unknown
-  encoding and the log entry is written at the *end* of travel, so neither
-  anchors the start - HA's command time (or half the poll gap) does.
+  encoding; the hub's "Opening/Closing by X" log entry (written at the
+  *start* of travel) anchors the estimate - see below.
 
 - **Change queue = push (live-verified)**: `app/res/messages` answers
   immediately (no long-poll) and is normally empty, but the hub queues one
@@ -63,6 +63,26 @@ tests/test_protocol.py   protocol tests (no HA needed)
   its clock matched HA's within ~0.5s, so that anchors the estimate.
 - The hub constantly broadcasts UDP camera-discovery probes (`MO_I` to :10000,
   `_IVO` to :20000) - unrelated to door state.
+
+## Vendor app findings (B&D Smart Garage Access 3.19.5, decompiled 2026-10-31)
+
+React Native + Hermes UI; the hub SDK is Java in `com.smartdoordevices.client.sdk`
+(obfuscated, in classes5.dex). Decompiled with androguard (pure Python, no JDK).
+
+- **LAN discovery** (`LanDiscovery`): UDP broadcast `{"base":1}` to port **8453**;
+  the hub replies JSON `{bsid, name, ip, version, mode, mono, clock, ...}`.
+  Live-verified (fw 1.5.1086). Implemented in `protocol/discovery.py`: config
+  flow pre-fills the host; setup/coordinator re-find a hub whose IP changed.
+- **The app also polls**: legacy `ConnectionPolling` drains `app/res/messages`
+  every 1000 ms (same as our listener); the SDK `LanChannel` calls `sdk/poll`
+  every 1000 ms. There is no true push channel.
+- **Cloud relay**: `app/connect` returns `communicationType`; 2 = relay, where
+  every call goes to `https://version3.smartdoordevices.com/app/res/request`
+  with the real endpoint in a `path` field. That's how the app kept working
+  while HA couldn't reach the hub on the LAN. (Pairing uses `version2`; the app
+  now uses `version3` - both answered at the time of writing.)
+- `192.168.43.1:8990` is the hub's setup hotspot.
+- The `MulticastLock` is taken around discovery only.
 
 ## Status / validation
 

@@ -3,14 +3,14 @@
     "step": {
       "user": {
         "title": "Pair a B&D garage hub",
-        "description": "In the B&D Smart Garage Access app: Settings → Users → your hub → Add new user. Enter the activation code and the password the app assigns. Home Assistant will appear in the hub as its own user.",
+        "description": "In the B&D Smart Garage Access app: Settings → Users → your hub → Add new user. Enter the activation code and the password the app assigns. Home Assistant will appear in the hub as its own user.\n\n{discovered}",
         "data": {
           "host": "Hub IP address",
           "activation_code": "Activation code",
           "user_password": "User password"
         },
         "data_description": {
-          "host": "Give the hub a DHCP reservation so this doesn't change."
+          "host": "Filled in automatically when the hub answers discovery. Give the hub a DHCP reservation anyway; if its IP changes, the integration finds it again by itself."
         }
       },
       "reauth_confirm": {

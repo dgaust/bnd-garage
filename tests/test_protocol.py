@@ -192,3 +192,25 @@ def test_parse_events_ignores_other_messages() -> None:
     assert models.parse_events([{"processState": -1, "data": "{}"}]) == []
     assert models.parse_events([{"processState": 0, "data": "not json"}]) == []
     assert models.parse_events([{"processState": 0, "data": '{"code": 1}'}]) == []
+
+
+from bnd_protocol import discovery  # noqa: E402
+
+REAL_REPLY = (
+    b'{"bsid":"n4A9ArXG6TFmr7gP8PQAUA","protocol":"BROADCAST","clock":1793413716075,'
+    b'"name":"Home New","base":2,"mono":12666376202237941,"echo":"{\\"base\\":1}",'
+    b'"version":"1.5.1086","mode":2,"ip":"10.0.0.252"}'
+)
+
+
+def test_discovery_reply_parsed() -> None:
+    hub = discovery.parse_reply(REAL_REPLY)
+    assert hub == discovery.DiscoveredHub(
+        hub_id="n4A9ArXG6TFmr7gP8PQAUA", name="Home New", ip="10.0.0.252",
+        version="1.5.1086", mode=2,
+    )
+
+
+@pytest.mark.parametrize("junk", [b"", b"not json", b"[]", b'{"name":"x"}', b'{"bsid":"a"}'])
+def test_discovery_ignores_junk(junk: bytes) -> None:
+    assert discovery.parse_reply(junk) is None

@@ -43,6 +43,7 @@ from .protocol import (
     pair_new_phone,
     read_hub_id,
 )
+from .protocol.discovery import discover_hubs
 from .protocol.transport import hub_ssl_context
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,11 +100,28 @@ class BndSmartGarageConfigFlow(ConfigFlow, domain=DOMAIN):
                         title=f"B&D hub {credentials.hub_id}",
                         data={CONF_HOST: host, CONF_CREDENTIALS: credentials.as_dict()},
                     )
+        suggested = dict(user_input or {})
+        found = "No hub answered on this network - enter its IP address."
+        if user_input is None:
+            # Pre-fill the first hub that answers LAN discovery and isn't set up yet.
+            configured = self._async_current_ids()
+            try:
+                hubs = [h for h in await discover_hubs() if h.hub_id not in configured]
+            except OSError as err:
+                _LOGGER.debug("Hub discovery failed: %s", err)
+                hubs = []
+            if hubs:
+                suggested[CONF_HOST] = hubs[0].ip
+                found = ", ".join(
+                    f"{h.name or h.hub_id} at {h.ip} (firmware {h.version or '?'})" for h in hubs
+                )
+                found = f"Found: {found}."
         schema = vol.Schema({vol.Required(CONF_HOST): str, **_PAIR_FIELDS})
         return self.async_show_form(
             step_id="user",
-            data_schema=self.add_suggested_values_to_schema(schema, user_input or {}),
+            data_schema=self.add_suggested_values_to_schema(schema, suggested),
             errors=errors,
+            description_placeholders={"discovered": found},
         )
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:

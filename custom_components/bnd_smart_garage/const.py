@@ -33,6 +33,9 @@ ESTIMATE_REFRESH_INTERVAL: Final = timedelta(seconds=1)
 """How often the cover re-publishes its estimated position while moving."""
 
 DEVICE_RESCAN_INTERVAL: Final = timedelta(minutes=30)
+
+REDISCOVER_INTERVAL: Final = timedelta(minutes=5)
+"""Minimum gap between LAN rediscovery attempts while the hub is unreachable."""
 """How often to check the hub for doors added after pairing."""
 
 EVENT_ACTIVITY: Final = f"{DOMAIN}_activity"

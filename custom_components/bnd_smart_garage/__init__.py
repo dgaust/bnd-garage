@@ -15,6 +15,7 @@ from .const import CONF_CREDENTIALS, DOMAIN
 from .coordinator import BndCoordinator
 from .entity import hub_device_info
 from .protocol import AuthenticationError, Credentials, GarageError, HubClient
+from .protocol.discovery import find_hub
 from .protocol.transport import hub_ssl_context
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +44,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: BndConfigEntry) -> bool:
     except AuthenticationError as err:
         raise ConfigEntryAuthFailed(str(err)) from err
     except GarageError as err:
+        # The hub may have a new IP: find it by ID via LAN discovery, save the
+        # new address, and let the retry pick it up.
+        try:
+            hub = await find_hub(credentials.hub_id)
+        except OSError:
+            hub = None
+        if hub is not None and hub.ip != entry.data[CONF_HOST]:
+            _LOGGER.warning(
+                "B&D hub %s found at new address %s (was %s)",
+                credentials.hub_id, hub.ip, entry.data[CONF_HOST],
+            )
+            hass.config_entries.async_update_entry(
+                entry, data={**entry.data, CONF_HOST: hub.ip}
+            )
         raise ConfigEntryNotReady(str(err)) from err
 
     try:
